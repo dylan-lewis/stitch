@@ -2,44 +2,61 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.NetworkInformation;
 
 namespace stitch
 {
     public class Program
     {
+        private const string FileType = ".csv";
+        private static readonly string Cr = Environment.NewLine;
+        private static readonly string Dir = Directory.GetCurrentDirectory();
+
         public static void Main(string[] args)
         {
-            const string dir = @"C:\temp\";  //Directory.GetCurrentDirectory();
-            const string fileType = "*.csv";
+            
             string header = null;
+            var message = "File stitching cancelled.";
 
-            Console.WriteLine($@"Working in directory {dir}");
 
+            ////strip paths
+            //foreach (var filePath in inputFilePaths)
+            //{
+            //    int split = filePath.LastIndexOf(Path.DirectorySeparatorChar);
+            //    inputFileNames.Add(filePath.Substring(split + 1));
+            //}
+
+            Console.WriteLine($@"Working in directory {Dir}");
+
+            var filePaths = Directory.GetFiles(Dir, "*"+ FileType);
+            var fileNames = new List<string>();
             try
             {
-                string[] filePaths = Directory.GetFiles(dir, fileType);
-                int fileCount = filePaths.Length;
+                var fileCount = filePaths.Length;
+                var data = new List<string>();
 
-                List<string> data = new List<string>();
+                Console.WriteLine($"{Cr}Processing {filePaths.Length} file{PrintSIfPlural(filePaths.Length)}:");
 
-                Console.WriteLine($"\nProcessing {fileCount} file" +
-                                  ((fileCount != 1) ? "s:" : ":"));
-
-                foreach (string filePath in filePaths)
+                foreach (var filePath in filePaths)
                 {
+                    //remove path data, add to fileName list, and display file name
+                    var fileName = GetFileNameFromPath(filePath);
+                    fileNames.Add((fileName));
+                    Console.Write($"\t{fileName}... ");
 
-                    Console.Write($"\t {filePath}... ");
+                    //read file, ensure data exists
+                    var content = File.ReadAllLines(filePath).ToList();
+                    if (content.Count == 0)
+                        throw new InvalidDataException("No data in file");
 
-                    //read file and check header consistency
-                    List<string> content = File.ReadAllLines(filePath).ToList();
+                    //check header consistency then add lines to data
                     if (header == null)
                     {
                         header = content[0];
                     }
                     else if (header != content[0])
                     {
-                        const string error = "Inconsistant data headings.";
-                        throw new NotSupportedException(error);
+                        throw new InvalidDataException("Inconsistant data headings");
                     }
                     else
                     {
@@ -47,40 +64,40 @@ namespace stitch
                     }
 
                     //TODO check for duplicates?
-
+                    Console.Write($"{content.Count} row{PrintSIfPlural(content.Count)}.\t");
                     data.AddRange(content);
-                    Console.WriteLine($" { content.Count} rows.\tOK");
+                    Console.WriteLine("OK.");
 
                 }
 
-                Console.WriteLine($"Writing header (1 row) and data ({data.Count} " + 
-                    ((data.Count == 1) ? "row" : "rows") + ").");
+                Console.WriteLine($"{Cr}Writing 1 header row and {data.Count} data row{PrintSIfPlural(data.Count)}.");
+                Console.WriteLine($"Output to {WriteFile(data, DetermineOutputFileName(filePaths))}");
 
-                Console.WriteLine($"Output to {WriteFile(data)}");
-
-                Console.WriteLine("\nSuccess.");
+                message = "Success.";
             }
 
 
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message + Environment.NewLine + "Processing cancelled.");
+                Console.WriteLine($"{Cr}\t{ex.Message}. {Cr}Please check input data file before trying again.{Cr}");
             }
             finally
             {
-                Console.ReadLine();
+                Console.WriteLine(message);
+                Console.ReadKey();
             }
+
         }
 
-        public static string WriteFile(List<string> lines, string fileName = "output")
+        private static string WriteFile(List<string> lines, string fileName)
         {
-            string outExtension = ".csv";
-            string outFolder = Environment.GetFolderPath(
+            var outFolder = Environment.GetFolderPath(
                 Environment.SpecialFolder.Desktop
-                );
-            string outTimeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            string outPath = outFolder + Path.DirectorySeparatorChar + 
-                        fileName + outTimeStamp + outExtension;
+                ) 
+                + Path.DirectorySeparatorChar;
+            var timeStamp = DateTime.Now.ToString("yyyy-MM-dd_HHmmss");
+            var outPath = outFolder + Path.DirectorySeparatorChar + 
+                        fileName + timeStamp + FileType;
 
             if (!File.Exists(outPath))
             {
@@ -90,5 +107,55 @@ namespace stitch
             return outPath;
         }
 
+        private static string GetFileNameFromPath(string filePath)
+        {
+            var split = filePath.LastIndexOf(Path.DirectorySeparatorChar);
+            return filePath.Substring(split + 1);
+        }
+
+
+
+        //TODO
+        private static string DetermineOutputFileName(string[] inputFiles)
+        {
+            var outputFileName = "stitched";
+            var tempName = String.Empty;
+            var inputFileNames = new List<string>();
+
+            foreach (var fileName in inputFiles)
+            {
+                Console.WriteLine(fileName);
+                if (tempName.Equals((String.Empty)))
+                {
+                    tempName = fileName;
+                }
+                else
+                {
+                    //keep chars in common with temp file
+
+                }
+            }
+
+
+
+            
+
+            return outputFileName;
+        }
+
+
+        private static string PrintSIfPlural(int count)
+        {
+            return count == 1 ? string.Empty : "s";
+        }
+    }
+
+    public class InvalidDataException : Exception
+    {
+        public InvalidDataException(string message)
+            : base(message)
+        {
+            
+        }
     }
 }
